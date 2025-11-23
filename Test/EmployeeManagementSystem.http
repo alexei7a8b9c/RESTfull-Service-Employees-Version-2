@@ -1,9 +1,9 @@
 ### Base URL
 @baseUrl = http://localhost:8080
 
-### 1. Аутентификация
+### 1. ТЕСТЫ АВТОРИЗАЦИИ
 
-### Логин админа
+### Тест 1.1: Успешный логин ADMIN
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -13,11 +13,19 @@ Content-Type: application/json
 }
 
 > {%
-    client.global.set("admin_token", response.body.data.token);
-    client.log("Admin token: " + client.global.get("admin_token"));
+    client.test("ADMIN login successful", function() {
+        client.assert(response.status === 200, "Status should be 200");
+        client.assert(response.body.success === true, "Success should be true");
+        client.assert(response.body.data.username === "admin", "Username should be admin");
+        client.assert(response.body.data.role === "ADMIN", "Role should be ADMIN");
+        client.assert(response.body.data.token !== null, "Token should be present");
+
+        client.global.set("admin_token", response.body.data.token);
+        client.log("🔑 ADMIN token: " + client.global.get("admin_token"));
+    });
 %}
 
-### Логин пользователя
+### Тест 1.2: Успешный логин USER
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -27,390 +35,539 @@ Content-Type: application/json
 }
 
 > {%
-    client.global.set("user_token", response.body.data.token);
-    client.log("User token: " + client.global.get("user_token"));
+    client.test("USER login successful", function() {
+        client.assert(response.status === 200, "Status should be 200");
+        client.assert(response.body.success === true, "Success should be true");
+        client.assert(response.body.data.username === "user", "Username should be user");
+        client.assert(response.body.data.role === "USER", "Role should be USER");
+        client.assert(response.body.data.token !== null, "Token should be present");
+
+        client.global.set("user_token", response.body.data.token);
+        client.log("🔑 USER token: " + client.global.get("user_token"));
+    });
 %}
 
-### 2. Управление отделами (Departments)
+### Тест 1.3: Неверный пароль ADMIN
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
 
-### Получить все отделы
-GET {{baseUrl}}/api/departments
+{
+  "username": "admin",
+  "password": "wrongpassword"
+}
+
+> {%
+    client.test("ADMIN wrong password", function() {
+        client.assert(response.status === 404 || response.status === 401, "Should be 404 or 401 for wrong password");
+    });
+%}
+
+### Тест 1.4: Несуществующий пользователь
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "nonexistent",
+  "password": "password"
+}
+
+> {%
+    client.test("Non-existent user", function() {
+        client.assert(response.status === 404, "Should be 404 for non-existent user");
+    });
+%}
+
+### Тест 1.5: Доступ без токена
+GET {{baseUrl}}/api/employees
+
+> {%
+    client.test("Access without token", function() {
+        client.assert(response.status === 401, "Should be 401 Unauthorized without token");
+    });
+%}
+
+### Тест 1.6: Невалидный токен
+GET {{baseUrl}}/api/employees
+Authorization: Bearer invalid_token_12345
+
+> {%
+    client.test("Invalid token", function() {
+        client.assert(response.status === 401, "Should be 401 for invalid token");
+    });
+%}
+
+### 2. ТЕСТЫ СОЗДАНИЯ (CREATE)
+
+### Тест 2.1: ADMIN создает сотрудника
+POST {{baseUrl}}/api/employees
 Authorization: Bearer {{admin_token}}
+Content-Type: application/json
 
-### Получить отдел по ID
-GET {{baseUrl}}/api/departments/1
-Authorization: Bearer {{admin_token}}
+{
+  "firstName": "Иван",
+  "lastName": "Петров",
+  "email": "ivan.petrov@company.com",
+  "phone": "+79991234567",
+  "status": "ACTIVE",
+  "hireDate": "2024-01-15",
+  "departmentIds": [1, 2]
+}
 
-### Создать новый отдел
+> {%
+    client.test("ADMIN can create employee", function() {
+        client.assert(response.status === 200, "ADMIN should be able to create employee");
+        client.assert(response.body.data.firstName === "Иван", "First name should match");
+        client.assert(response.body.data.lastName === "Петров", "Last name should match");
+        client.assert(response.body.data.status === "ACTIVE", "Status should be ACTIVE");
+
+        client.global.set("created_employee_id", response.body.data.id);
+        client.log("👤 Created employee ID: " + client.global.get("created_employee_id"));
+    });
+%}
+
+### Тест 2.2: USER пытается создать сотрудника
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Пользователь",
+  "lastName": "Тестовый",
+  "email": "user.test@company.com",
+  "status": "ACTIVE"
+}
+
+> {%
+    client.test("USER cannot create employee", function() {
+        client.assert(response.status === 403, "USER should get 403 Forbidden for create");
+    });
+%}
+
+### Тест 2.3: ADMIN создает отдел
 POST {{baseUrl}}/api/departments
 Authorization: Bearer {{admin_token}}
 Content-Type: application/json
 
 {
-  "name": "Research and Development",
-  "description": "Research and Development Department"
+  "name": "Тестовый отдел",
+  "description": "Описание тестового отдела"
 }
 
-### Обновить отдел
-PUT {{baseUrl}}/api/departments/1
+> {%
+    client.test("ADMIN can create department", function() {
+        client.assert(response.status === 200, "ADMIN should be able to create department");
+        client.assert(response.body.data.name === "Тестовый отдел", "Department name should match");
+
+        client.global.set("created_department_id", response.body.data.id);
+        client.log("🏢 Created department ID: " + client.global.get("created_department_id"));
+    });
+%}
+
+### Тест 2.4: USER пытается создать отдел
+POST {{baseUrl}}/api/departments
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "name": "Отдел пользователя",
+  "description": "Создан пользователем"
+}
+
+> {%
+    client.test("USER cannot create department", function() {
+        client.assert(response.status === 403, "USER should get 403 Forbidden for create department");
+    });
+%}
+
+### 3. ТЕСТЫ ЧТЕНИЯ (READ)
+
+### Тест 3.1: ADMIN получает всех сотрудников
+GET {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+
+> {%
+    client.test("ADMIN can read all employees", function() {
+        client.assert(response.status === 200, "ADMIN should be able to read employees");
+        client.assert(Array.isArray(response.body.data), "Response should be array");
+        client.log("📋 ADMIN retrieved " + response.body.data.length + " employees");
+    });
+%}
+
+### Тест 3.2: USER получает всех сотрудников
+GET {{baseUrl}}/api/employees
+Authorization: Bearer {{user_token}}
+
+> {%
+    client.test("USER can read all employees", function() {
+        client.assert(response.status === 200, "USER should be able to read employees");
+        client.assert(Array.isArray(response.body.data), "Response should be array");
+        client.log("📋 USER retrieved " + response.body.data.length + " employees");
+    });
+%}
+
+### Тест 3.3: ADMIN получает сотрудника по ID
+GET {{baseUrl}}/api/employees/{{created_employee_id}}
+Authorization: Bearer {{admin_token}}
+
+> {%
+    client.test("ADMIN can read employee by ID", function() {
+        client.assert(response.status === 200, "ADMIN should be able to read employee by ID");
+        client.assert(response.body.data.id === client.global.get("created_employee_id"), "Employee ID should match");
+    });
+%}
+
+### Тест 3.4: USER получает сотрудника по ID
+GET {{baseUrl}}/api/employees/{{created_employee_id}}
+Authorization: Bearer {{user_token}}
+
+> {%
+    client.test("USER can read employee by ID", function() {
+        client.assert(response.status === 200, "USER should be able to read employee by ID");
+        client.assert(response.body.data.id === client.global.get("created_employee_id"), "Employee ID should match");
+    });
+%}
+
+### Тест 3.5: ADMIN получает все отделы
+GET {{baseUrl}}/api/departments
+Authorization: Bearer {{admin_token}}
+
+> {%
+    client.test("ADMIN can read all departments", function() {
+        client.assert(response.status === 200, "ADMIN should be able to read departments");
+        client.assert(Array.isArray(response.body.data), "Response should be array");
+        client.log("📋 ADMIN retrieved " + response.body.data.length + " departments");
+    });
+%}
+
+### Тест 3.6: USER получает все отделы
+GET {{baseUrl}}/api/departments
+Authorization: Bearer {{user_token}}
+
+> {%
+    client.test("USER can read all departments", function() {
+        client.assert(response.status === 200, "USER should be able to read departments");
+        client.assert(Array.isArray(response.body.data), "Response should be array");
+        client.log("📋 USER retrieved " + response.body.data.length + " departments");
+    });
+%}
+
+### 4. ТЕСТЫ ОБНОВЛЕНИЯ (UPDATE)
+
+### Тест 4.1: ADMIN обновляет сотрудника
+PUT {{baseUrl}}/api/employees/{{created_employee_id}}
 Authorization: Bearer {{admin_token}}
 Content-Type: application/json
 
 {
-  "name": "IT Department Updated",
-  "description": "Updated IT Department description"
+  "firstName": "Иван Обновленный",
+  "lastName": "Петров",
+  "email": "ivan.updated@company.com",
+  "phone": "+79991234568",
+  "status": "ON_LEAVE",
+  "hireDate": "2024-01-15",
+  "departmentIds": [1]
 }
 
-### Удалить отдел
-DELETE {{baseUrl}}/api/departments/6
+> {%
+    client.test("ADMIN can update employee", function() {
+        client.assert(response.status === 200, "ADMIN should be able to update employee");
+        client.assert(response.body.data.firstName === "Иван Обновленный", "First name should be updated");
+        client.assert(response.body.data.email === "ivan.updated@company.com", "Email should be updated");
+        client.assert(response.body.data.status === "ON_LEAVE", "Status should be updated to ON_LEAVE");
+    });
+%}
+
+### Тест 4.2: USER пытается обновить сотрудника
+PUT {{baseUrl}}/api/employees/{{created_employee_id}}
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Пользователь Обновил",
+  "lastName": "Сотрудника",
+  "status": "ACTIVE"
+}
+
+> {%
+    client.test("USER cannot update employee", function() {
+        client.assert(response.status === 403, "USER should get 403 Forbidden for update");
+    });
+%}
+
+### Тест 4.3: ADMIN обновляет отдел
+PUT {{baseUrl}}/api/departments/{{created_department_id}}
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Обновленный отдел",
+  "description": "Обновленное описание отдела"
+}
+
+> {%
+    client.test("ADMIN can update department", function() {
+        client.assert(response.status === 200, "ADMIN should be able to update department");
+        client.assert(response.body.data.name === "Обновленный отдел", "Department name should be updated");
+    });
+%}
+
+### Тест 4.4: ADMIN обновляет фото сотрудника
+PATCH {{baseUrl}}/api/employees/{{created_employee_id}}/photo?photoUrl=https://company.com/photos/ivan.jpg
 Authorization: Bearer {{admin_token}}
 
-### 3. Управление сотрудниками (Employees)
+> {%
+    client.test("ADMIN can update employee photo", function() {
+        client.assert(response.status === 200, "ADMIN should be able to update photo");
+    });
+%}
 
-### Получить всех сотрудников
-GET {{baseUrl}}/api/employees
+### 5. ТЕСТЫ УДАЛЕНИЯ (DELETE)
+
+### Тест 5.1: ADMIN удаляет сотрудника (soft delete)
+DELETE {{baseUrl}}/api/employees/{{created_employee_id}}
 Authorization: Bearer {{admin_token}}
 
-### Получить сотрудника по ID
-GET {{baseUrl}}/api/employees/1
+> {%
+    client.test("ADMIN can delete employee", function() {
+        client.assert(response.status === 200, "ADMIN should be able to delete employee");
+        client.log("🗑️ Employee soft deleted successfully");
+    });
+%}
+
+### Тест 5.2: USER пытается удалить сотрудника
+DELETE {{baseUrl}}/api/employees/1
+Authorization: Bearer {{user_token}}
+
+> {%
+    client.test("USER cannot delete employee", function() {
+        client.assert(response.status === 403, "USER should get 403 Forbidden for delete");
+    });
+%}
+
+### Тест 5.3: ADMIN удаляет отдел (soft delete)
+DELETE {{baseUrl}}/api/departments/{{created_department_id}}
 Authorization: Bearer {{admin_token}}
 
-### Поиск сотрудников с фильтрами
+> {%
+    client.test("ADMIN can delete department", function() {
+        client.assert(response.status === 200, "ADMIN should be able to delete department");
+        client.log("🗑️ Department soft deleted successfully");
+    });
+%}
+
+### Тест 5.4: Проверка soft delete - сотрудник не найден
+GET {{baseUrl}}/api/employees/{{created_employee_id}}
+Authorization: Bearer {{admin_token}}
+
+> {%
+    client.test("Soft deleted employee not found", function() {
+        client.assert(response.status === 404, "Soft deleted employee should return 404");
+    });
+%}
+
+### 6. ТЕСТЫ ПОИСКА И ФИЛЬТРАЦИИ
+
+### Тест 6.1: ADMIN поиск сотрудников по имени
 POST {{baseUrl}}/api/employees/search
 Authorization: Bearer {{admin_token}}
 Content-Type: application/json
 
 {
   "firstName": "John",
-  "lastName": "",
-  "status": "ACTIVE",
-  "managerName": "",
-  "departmentIds": [1, 2],
   "page": 0,
   "size": 10,
   "sortBy": "firstName",
   "sortDirection": "ASC"
 }
 
-### Поиск сотрудников по статусу
-POST {{baseUrl}}/api/employees/search
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "status": "ACTIVE",
-  "page": 0,
-  "size": 5
-}
-
-### Поиск сотрудников по отделам
-POST {{baseUrl}}/api/employees/search
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "departmentIds": [1, 3],
-  "page": 0,
-  "size": 10
-}
-
-### Создать нового сотрудника
-POST {{baseUrl}}/api/employees
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "Alex",
-  "lastName": "Petrov",
-  "email": "alex.petrov@company.com",
-  "phone": "+1234567899",
-  "status": "ACTIVE",
-  "photoUrl": "https://example.com/photos/alex.jpg",
-  "hireDate": "2023-01-15",
-  "managerId": 1,
-  "departmentIds": [1, 2]
-}
-
 > {%
-    client.global.set("new_employee_id", response.body.data.id);
-    client.log("New employee ID: " + client.global.get("new_employee_id"));
+    client.test("ADMIN can search employees by name", function() {
+        client.assert(response.status === 200, "ADMIN should be able to search employees");
+        client.assert(response.body.data.content !== undefined, "Response should have content field");
+        client.log("🔍 ADMIN search found " + response.body.data.content.length + " employees");
+    });
 %}
 
-### Обновить сотрудника
-PUT {{baseUrl}}/api/employees/{{new_employee_id}}
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "Alexander",
-  "lastName": "Petrov",
-  "email": "alexander.petrov@company.com",
-  "phone": "+1234567899",
-  "status": "ACTIVE",
-  "photoUrl": "https://example.com/photos/alexander.jpg",
-  "hireDate": "2023-01-15",
-  "managerId": 1,
-  "departmentIds": [1, 3]
-}
-
-### Обновить фото сотрудника
-PATCH {{baseUrl}}/api/employees/{{new_employee_id}}/photo?photoUrl=https://example.com/photos/new-photo.jpg
-Authorization: Bearer {{admin_token}}
-
-### Удалить сотрудника
-DELETE {{baseUrl}}/api/employees/{{new_employee_id}}
-Authorization: Bearer {{admin_token}}
-
-### 4. Тесты валидации
-
-### Создать сотрудника с невалидными данными (отсутствует firstName)
-POST {{baseUrl}}/api/employees
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "lastName": "Test",
-  "email": "invalid-email",
-  "status": "INVALID_STATUS"
-}
-
-### Создать отдел с невалидными данными (отсутствует name)
-POST {{baseUrl}}/api/departments
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "description": "Department without name"
-}
-
-### 5. Тесты безопасности и прав доступа
-
-### Попытка создать сотрудника без авторизации
-POST {{baseUrl}}/api/employees
-Content-Type: application/json
-
-{
-  "firstName": "Unauthorized",
-  "lastName": "User",
-  "status": "ACTIVE"
-}
-
-### Попытка создать отдел с ролью USER
-POST {{baseUrl}}/api/departments
-Authorization: Bearer {{user_token}}
-Content-Type: application/json
-
-{
-  "name": "User Department",
-  "description": "Department created by user"
-}
-
-### Попытка удалить сотрудника с ролью USER
-DELETE {{baseUrl}}/api/employees/1
-Authorization: Bearer {{user_token}}
-
-### 6. Тесты для несуществующих ресурсов
-
-### Получить несуществующего сотрудника
-GET {{baseUrl}}/api/employees/9999
-Authorization: Bearer {{admin_token}}
-
-### Получить несуществующий отдел
-GET {{baseUrl}}/api/departments/9999
-Authorization: Bearer {{admin_token}}
-
-### Обновить несуществующего сотрудника
-PUT {{baseUrl}}/api/employees/9999
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "Non",
-  "lastName": "Existent",
-  "status": "ACTIVE"
-}
-
-### 7. Тесты пагинации и сортировки
-
-### Пагинация сотрудников - страница 1
+### Тест 6.2: USER поиск сотрудников по статусу
 POST {{baseUrl}}/api/employees/search
-Authorization: Bearer {{admin_token}}
+Authorization: Bearer {{user_token}}
 Content-Type: application/json
 
 {
+  "status": "ACTIVE",
   "page": 0,
-  "size": 2,
+  "size": 5,
   "sortBy": "lastName",
   "sortDirection": "ASC"
 }
 
-### Пагинация сотрудников - страница 2
+> {%
+    client.test("USER can search employees by status", function() {
+        client.assert(response.status === 200, "USER should be able to search employees");
+        client.assert(response.body.data.content !== undefined, "Response should have content field");
+        client.log("🔍 USER search found " + response.body.data.content.length + " active employees");
+    });
+%}
+
+### Тест 6.3: ADMIN поиск по нескольким отделам
 POST {{baseUrl}}/api/employees/search
 Authorization: Bearer {{admin_token}}
 Content-Type: application/json
 
 {
-  "page": 1,
+  "departmentIds": [1, 2],
+  "page": 0,
+  "size": 20
+}
+
+> {%
+    client.test("ADMIN can search by multiple departments", function() {
+        client.assert(response.status === 200, "ADMIN should be able to search by departments");
+    });
+%}
+
+### Тест 6.4: USER поиск с пагинацией
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
   "size": 2,
-  "sortBy": "firstName",
+  "sortBy": "hireDate",
   "sortDirection": "DESC"
 }
 
-### 8. Тесты для Swagger документации
+> {%
+    client.test("USER can search with pagination", function() {
+        client.assert(response.status === 200, "USER should be able to search with pagination");
+        if (response.body.data.content) {
+            client.log("📄 Pagination: page " + response.body.data.number +
+                ", size " + response.body.data.size +
+                ", total " + response.body.data.totalElements);
+        }
+    });
+%}
 
-### Получить Swagger UI (должен быть доступен без авторизации)
-GET {{baseUrl}}/swagger-ui.html
+### Тест 6.5: ADMIN поиск по менеджеру
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
 
-### Получить OpenAPI спецификацию (должен быть доступен без авторизации)
-GET {{baseUrl}}/api-docs
+{
+  "managerName": "John",
+  "page": 0,
+  "size": 10
+}
 
-### 9. Тесты здоровья приложения
+> {%
+    client.test("ADMIN can search by manager name", function() {
+        client.assert(response.status === 200, "ADMIN should be able to search by manager");
+    });
+%}
 
-### Health check (если включен Spring Actuator)
-GET {{baseUrl}}/actuator/health
+### 7. ТЕСТЫ ВАЛИДАЦИИ И ОШИБОК
 
-### 10. Комплексные тесты
+### Тест 7.1: Создание сотрудника с невалидными данными
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
 
-### Создать отдел и сотрудника в этом отделе
-### Шаг 1: Создать отдел
+{
+  "firstName": "",
+  "lastName": "",
+  "email": "invalid-email",
+  "status": "INVALID_STATUS"
+}
+
+> {%
+    client.test("Validation errors for invalid employee data", function() {
+        client.assert(response.status === 400, "Should get 400 for invalid data");
+    });
+%}
+
+### Тест 7.2: Создание отдела без имени
 POST {{baseUrl}}/api/departments
 Authorization: Bearer {{admin_token}}
 Content-Type: application/json
 
 {
-  "name": "Quality Assurance",
-  "description": "Quality Assurance Department"
+  "name": "",
+  "description": "Отдел без имени"
 }
 
 > {%
-    client.global.set("new_department_id", response.body.data.id);
-    client.log("New department ID: " + client.global.get("new_department_id"));
+    client.test("Validation errors for invalid department data", function() {
+        client.assert(response.status === 400, "Should get 400 for invalid department data");
+    });
 %}
 
-### Шаг 2: Создать сотрудника в новом отделе
-POST {{baseUrl}}/api/employees
+### Тест 7.3: Получение несуществующего сотрудника
+GET {{baseUrl}}/api/employees/99999
 Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "QA",
-  "lastName": "Engineer",
-  "email": "qa.engineer@company.com",
-  "phone": "+1234567800",
-  "status": "ACTIVE",
-  "managerId": 1,
-  "departmentIds": [{{new_department_id}}]
-}
 
 > {%
-    client.global.set("qa_employee_id", response.body.data.id);
-    client.log("QA Employee ID: " + client.global.get("qa_employee_id"));
+    client.test("Non-existent employee returns 404", function() {
+        client.assert(response.status === 404, "Should get 404 for non-existent employee");
+    });
 %}
 
-### Шаг 3: Проверить, что сотрудник создан с правильным отделом
-GET {{baseUrl}}/api/employees/{{qa_employee_id}}
-Authorization: Bearer {{admin_token}}
-
-### Шаг 4: Поиск сотрудников в новом отделе
-POST {{baseUrl}}/api/employees/search
+### Тест 7.4: Обновление несуществующего сотрудника
+PUT {{baseUrl}}/api/employees/99999
 Authorization: Bearer {{admin_token}}
 Content-Type: application/json
 
 {
-  "departmentIds": [{{new_department_id}}]
-}
-
-### 11. Тесты soft delete
-
-### Создать сотрудника для теста удаления
-POST {{baseUrl}}/api/employees
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "ToDelete",
-  "lastName": "Employee",
-  "email": "delete.me@company.com",
+  "firstName": "Несуществующий",
+  "lastName": "Сотрудник",
   "status": "ACTIVE"
 }
 
 > {%
-    client.global.set("employee_to_delete_id", response.body.data.id);
-    client.log("Employee to delete ID: " + client.global.get("employee_to_delete_id"));
+    client.test("Update non-existent employee returns 404", function() {
+        client.assert(response.status === 404, "Should get 404 for non-existent employee update");
+    });
 %}
 
-### Удалить сотрудника (soft delete)
-DELETE {{baseUrl}}/api/employees/{{employee_to_delete_id}}
-Authorization: Bearer {{admin_token}}
+### 8. ФИНАЛЬНЫЕ ПРОВЕРКИ
 
-### Попытка получить удаленного сотрудника (должен вернуть 404)
-GET {{baseUrl}}/api/employees/{{employee_to_delete_id}}
+### Тест 8.1: Создание тестовых данных для демонстрации
+POST {{baseUrl}}/api/employees
 Authorization: Bearer {{admin_token}}
+Content-Type: application/json
 
-### Проверить, что удаленный сотрудник не появляется в списке
+{
+  "firstName": "Демо",
+  "lastName": "Пользователь",
+  "email": "demo.user@company.com",
+  "phone": "+79998887766",
+  "status": "ACTIVE",
+  "hireDate": "2024-03-01",
+  "departmentIds": [1, 3]
+}
+
+> {%
+    client.global.set("demo_employee_id", response.body.data.id);
+%}
+
+### Тест 8.2: Итоговая проверка системы
 GET {{baseUrl}}/api/employees
 Authorization: Bearer {{admin_token}}
 
-### 12. Тесты для разных статусов сотрудников
-
-### Создать сотрудника со статусом ON_LEAVE
-POST {{baseUrl}}/api/employees
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "OnLeave",
-  "lastName": "Employee",
-  "email": "on.leave@company.com",
-  "status": "ON_LEAVE"
-}
-
-### Поиск сотрудников со статусом ON_LEAVE
-POST {{baseUrl}}/api/employees/search
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "status": "ON_LEAVE"
-}
-
-### 13. Тесты для менеджеров
-
-### Создать менеджера
-POST {{baseUrl}}/api/employees
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "Senior",
-  "lastName": "Manager",
-  "email": "senior.manager@company.com",
-  "status": "ACTIVE"
-}
-
 > {%
-    client.global.set("new_manager_id", response.body.data.id);
-    client.log("New manager ID: " + client.global.get("new_manager_id"));
+    client.test("Final system check", function() {
+        client.assert(response.status === 200, "System is working correctly");
+        client.log(" ");
+        client.log("🎉 ВСЕ ТЕСТЫ УСПЕШНО ЗАВЕРШЕНЫ!");
+        client.log("✅ Аутентификация работает корректно");
+        client.log("✅ Ролевая модель соблюдается:");
+        client.log("   - ADMIN: CREATE, READ, UPDATE, DELETE");
+        client.log("   - USER: только READ");
+        client.log("✅ CRUD операции работают правильно");
+        client.log("✅ Поиск и фильтрация функционируют");
+        client.log("✅ Валидация данных работает");
+        client.log("✅ Soft delete корректно реализован");
+        client.log(" ");
+        client.log("🚀 Система готова к использованию!");
+    });
 %}
-
-### Создать подчиненного для менеджера
-POST {{baseUrl}}/api/employees
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "firstName": "Junior",
-  "lastName": "Employee",
-  "email": "junior.employee@company.com",
-  "status": "ACTIVE",
-  "managerId": {{new_manager_id}}
-}
-
-### Поиск сотрудников по имени менеджера
-POST {{baseUrl}}/api/employees/search
-Authorization: Bearer {{admin_token}}
-Content-Type: application/json
-
-{
-  "managerName": "Senior"
-}

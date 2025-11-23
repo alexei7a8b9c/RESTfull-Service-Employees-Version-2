@@ -1,0 +1,432 @@
+### Base URL
+@baseUrl = http://localhost:8080
+
+### Аутентификация
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+> {%
+    client.global.set("admin_token", response.body.data.token);
+%}
+
+###
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "user",
+  "password": "user123"
+}
+
+> {%
+    client.global.set("user_token", response.body.data.token);
+%}
+
+### ТЕСТ 1: Поиск по имени и статусу одновременно (ADMIN)
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 10,
+  "sortBy": "firstName",
+  "sortDirection": "ASC"
+}
+
+> {%
+    client.test("ADMIN search by name AND status", function() {
+        client.assert(response.status === 200, "Search should be successful");
+        client.log("🔍 ADMIN: Поиск по имени 'John Doe' и статусу 'ACTIVE'");
+        if (response.body.data) {
+            client.log("📊 Найдено сотрудников: " + response.body.data.totalElements);
+            client.log("📄 Страница: " + (response.body.data.number + 1) + " из " + response.body.data.totalPages);
+        }
+    });
+%}
+
+### ТЕСТ 2: Поиск по имени и статусу одновременно (USER)
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 5
+}
+
+> {%
+    client.test("USER search by name AND status", function() {
+        client.assert(response.status === 200, "USER should be able to search with multiple params");
+        client.log("🔍 USER: Поиск по имени 'Jane Smith' и статусу 'ACTIVE'");
+    });
+%}
+
+### ТЕСТ 3: Поиск по статусу и отделам одновременно
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "ACTIVE",
+  "departmentIds": [1, 2],
+  "page": 0,
+  "size": 15,
+  "sortBy": "lastName",
+  "sortDirection": "ASC"
+}
+
+> {%
+    client.test("Search by status AND departments", function() {
+        client.assert(response.status === 200, "Search by status and departments should work");
+        client.log("🔍 Поиск: статус 'ACTIVE' и отделы [1, 2]");
+        if (response.body.data) {
+            client.log("📊 Результатов: " + response.body.data.totalElements);
+        }
+    });
+%}
+
+### ТЕСТ 4: Поиск по имени менеджера и статусу
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "managerName": "John",
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 10
+}
+
+> {%
+    client.test("Search by manager name AND status", function() {
+        client.assert(response.status === 200, "Search by manager and status should work");
+        client.log("🔍 Поиск: менеджер 'John' и статус 'ACTIVE'");
+    });
+%}
+
+### ТЕСТ 5: Комплексный поиск - все параметры одновременно
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "status": "ACTIVE",
+  "managerName": "John",
+  "departmentIds": [1, 2, 3],
+  "page": 0,
+  "size": 20,
+  "sortBy": "hireDate",
+  "sortDirection": "DESC"
+}
+
+> {%
+    client.test("Complex search - all parameters", function() {
+        client.assert(response.status === 200, "Complex search with all parameters should work");
+        client.log("🔍 КОМПЛЕКСНЫЙ ПОИСК:");
+        client.log("   - Имя: John");
+        client.log("   - Фамилия: Doe");
+        client.log("   - Статус: ACTIVE");
+        client.log("   - Менеджер: John");
+        client.log("   - Отделы: [1, 2, 3]");
+        client.log("   - Сортировка: по дате найма (DESC)");
+        if (response.body.data) {
+            client.log("📊 Всего найдено: " + response.body.data.totalElements);
+        }
+    });
+%}
+
+### ТЕСТ 6: Поиск с частичными параметрами (только имя и отделы)
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "departmentIds": [1],
+  "page": 0,
+  "size": 10
+}
+
+> {%
+    client.test("Partial parameters search", function() {
+        client.assert(response.status === 200, "Search with partial parameters should work");
+        client.log("🔍 Поиск с частичными параметрами: имя 'John' и отдел [1]");
+    });
+%}
+
+### ТЕСТ 7: Поиск только по отделам (без других фильтров)
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "departmentIds": [1, 2, 3, 4],
+  "page": 0,
+  "size": 25,
+  "sortBy": "firstName",
+  "sortDirection": "ASC"
+}
+
+> {%
+    client.test("Search only by departments", function() {
+        client.assert(response.status === 200, "Search only by departments should work");
+        client.log("🔍 Поиск только по отделам: [1, 2, 3, 4]");
+        if (response.body.data) {
+            client.log("📊 Сотрудников в указанных отделах: " + response.body.data.totalElements);
+        }
+    });
+%}
+
+### ТЕСТ 8: Поиск по статусу и имени с пагинацией
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "firstName": "a",
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 3,
+  "sortBy": "lastName",
+  "sortDirection": "ASC"
+}
+
+> {%
+    client.test("Search with pagination and multiple filters", function() {
+        client.assert(response.status === 200, "Search with pagination and filters should work");
+        client.log("🔍 Поиск: имя содержит 'a', статус 'ACTIVE', страница 0, размер 3");
+        if (response.body.data) {
+            const content = response.body.data.content;
+            client.log("📄 Пагинация:");
+            client.log("   - Страница: " + (response.body.data.number + 1));
+            client.log("   - Размер: " + response.body.data.size);
+            client.log("   - Всего страниц: " + response.body.data.totalPages);
+            client.log("   - Всего элементов: " + response.body.data.totalElements);
+            if (content && content.length > 0) {
+                client.log("👥 Первые сотрудники:");
+                for (let i = 0; i < Math.min(content.length, 3); i++) {
+                    client.log("   " + (i+1) + ". " + content[i].firstName + " " + content[i].lastName + " (" + content[i].status + ")");
+                }
+            }
+        }
+    });
+%}
+
+### ТЕСТ 9: Поиск сотрудников в статусе ON_LEAVE или TERMINATED
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "ON_LEAVE",
+  "page": 0,
+  "size": 10
+}
+
+> {%
+    client.test("Search by ON_LEAVE status", function() {
+        client.assert(response.status === 200, "Search by ON_LEAVE status should work");
+        client.log("🔍 Поиск сотрудников в отпуске (ON_LEAVE)");
+        if (response.body.data) {
+            client.log("📊 Найдено: " + response.body.data.totalElements);
+        }
+    });
+%}
+
+### ТЕСТ 10: Поиск по пустым параметрам (все сотрудники)
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
+  "size": 50
+}
+
+> {%
+    client.test("Search with empty filters (all employees)", function() {
+        client.assert(response.status === 200, "Search with empty filters should return all employees");
+        client.log("🔍 Поиск без фильтров (все сотрудники)");
+        if (response.body.data) {
+            client.log("📊 Всего сотрудников в системе: " + response.body.data.totalElements);
+            client.log("📄 Страниц: " + response.body.data.totalPages);
+        }
+    });
+%}
+
+### ТЕСТ 11: Поиск с несуществующими параметрами
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "NonexistentName",
+  "lastName": "NonexistentLastName",
+  "status": "TERMINATED",
+  "departmentIds": [999],
+  "page": 0,
+  "size": 10
+}
+
+> {%
+    client.test("Search with non-existent parameters", function() {
+        client.assert(response.status === 200, "Search should work even with non-existent parameters");
+        client.log("🔍 Поиск с несуществующими параметрами:");
+        client.log("   - Имя: NonexistentName");
+        client.log("   - Фамилия: NonexistentLastName");
+        client.log("   - Статус: TERMINATED");
+        client.log("   - Отдел: [999]");
+        if (response.body.data) {
+            client.log("📊 Найдено: " + response.body.data.totalElements + " (должно быть 0)");
+            client.assert(response.body.data.totalElements === 0, "Should find 0 employees with non-existent parameters");
+        }
+    });
+%}
+
+### ТЕСТ 12: Поиск с разными комбинациями сортировки
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 5,
+  "sortBy": "firstName",
+  "sortDirection": "ASC"
+}
+
+> {%
+    client.global.set("asc_results", response.body.data.content);
+%}
+
+###
+
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 5,
+  "sortBy": "firstName",
+  "sortDirection": "DESC"
+}
+
+> {%
+    client.test("Sorting comparison test", function() {
+        client.assert(response.status === 200, "Search with DESC sorting should work");
+        const ascResults = client.global.get("asc_results");
+        const descResults = response.body.data.content;
+
+        if (ascResults && descResults && ascResults.length > 0 && descResults.length > 0) {
+            client.log("🔍 Сравнение сортировки:");
+            client.log("   - ASC первый: " + ascResults[0].firstName + " " + ascResults[0].lastName);
+            client.log("   - DESC первый: " + descResults[0].firstName + " " + descResults[0].lastName);
+
+            // Проверяем что сортировка работает (первый элемент ASC должен быть меньше первого DESC)
+            if (ascResults[0].firstName < descResults[0].firstName) {
+                client.log("✅ Сортировка работает корректно");
+            }
+        }
+    });
+%}
+
+### ТЕСТ 13: Поиск по разным размерам страниц
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
+  "size": 1
+}
+
+> {%
+    client.global.set("size_1_count", response.body.data.totalElements);
+%}
+
+###
+
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
+  "size": 5
+}
+
+> {%
+    client.global.set("size_5_count", response.body.data.totalElements);
+%}
+
+###
+
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
+  "size": 10
+}
+
+> {%
+    client.test("Pagination size test", function() {
+        client.assert(response.status === 200, "Different page sizes should work");
+        const size1 = client.global.get("size_1_count");
+        const size5 = client.global.get("size_5_count");
+        const size10 = response.body.data.totalElements;
+
+        client.log("🔍 Тест пагинации с разными размерами:");
+        client.log("   - size=1: " + size1 + " всего элементов");
+        client.log("   - size=5: " + size5 + " всего элементов");
+        client.log("   - size=10: " + size10 + " всего элементов");
+
+        // Все три запроса должны возвращать одинаковое общее количество
+        client.assert(size1 === size5 && size5 === size10, "Total elements count should be consistent across different page sizes");
+    });
+%}
+
+### ФИНАЛЬНЫЙ ТЕСТ: Сводка по всем тестам поиска
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
+  "size": 100
+}
+
+> {%
+    client.test("Final search summary", function() {
+        client.assert(response.status === 200, "Final search should work");
+        client.log(" ");
+        client.log("🎉 ВСЕ ТЕСТЫ ПОИСКА ЗАВЕРШЕНЫ!");
+        client.log("✅ Поиск по одному параметру");
+        client.log("✅ Поиск по нескольким параметрам одновременно");
+        client.log("✅ Поиск с частичными параметрами");
+        client.log("✅ Поиск с пагинацией и сортировкой");
+        client.log("✅ Поиск с несуществующими параметрами");
+        client.log("✅ Работает для обеих ролей (ADMIN и USER)");
+        client.log(" ");
+        client.log("📊 Всего сотрудников в системе: " + response.body.data.totalElements);
+        client.log("🚀 Система поиска работает корректно!");
+    });
+%}

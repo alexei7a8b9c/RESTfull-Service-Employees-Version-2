@@ -3,24 +3,24 @@ spring:
     name: employee-management-system
   
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/employee_db}
-    username: ${SPRING_DATASOURCE_USERNAME:pos}
-    password: ${SPRING_DATASOURCE_PASSWORD:1234567}
+    url: jdbc:postgresql://localhost:5432/employee_db
+    username: pos
+    password: 1234567
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        show_sql: false
+        show_sql: true
         format_sql: true
     open-in-view: false
 
   flyway:
-    enabled: ${SPRING_FLYWAY_ENABLED:true}
-    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
+    enabled: true
+    locations: classpath:db/migration
     baseline-on-migrate: true
 
 server:

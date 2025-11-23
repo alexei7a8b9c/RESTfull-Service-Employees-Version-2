@@ -1,15 +1,16 @@
 package com.example.employeemanagement.service.impl;
 
+import com.example.employeemanagement.config.JwtUtil;
 import com.example.employeemanagement.dto.request.AuthRequest;
 import com.example.employeemanagement.dto.response.AuthResponse;
 import com.example.employeemanagement.entity.User;
 import com.example.employeemanagement.enums.Role;
+import com.example.employeemanagement.exception.ResourceNotFoundException;
 import com.example.employeemanagement.repository.UserRepository;
 import com.example.employeemanagement.service.UserService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -18,40 +19,49 @@ import org.springframework.stereotype.Service;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     @Override
     public AuthResponse authenticate(AuthRequest authRequest) {
-        // Simplified authentication - in real application use JWT tokens
-        User user = userRepository.findByUsername(authRequest.getUsername())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        log.info("Authenticating user: {}", authRequest.getUsername());
 
-        if (!passwordEncoder.matches(authRequest.getPassword(), user.getPassword())) {
+        User user = userRepository.findByUsername(authRequest.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Простая проверка пароля (без шифрования для тестирования)
+        if (!user.getPassword().equals(authRequest.getPassword())) {
             throw new RuntimeException("Invalid password");
         }
 
-        return new AuthResponse(user.getUsername(), user.getRole(), "dummy-token");
+        String token = jwtUtil.generateToken(user);
+
+        log.info("User {} authenticated successfully", authRequest.getUsername());
+        return new AuthResponse(user.getUsername(), user.getRole(), token);
     }
 
     @Override
     @PostConstruct
     public void initializeDefaultUsers() {
-        if (userRepository.count() == 0) {
-            log.info("Initializing default users");
+        try {
+            if (userRepository.count() == 0) {
+                log.info("Initializing default users");
 
-            User admin = new User();
-            admin.setUsername("admin");
-            admin.setPassword(passwordEncoder.encode("admin123"));
-            admin.setRole(Role.ADMIN);
-            userRepository.save(admin);
+                User admin = new User();
+                admin.setUsername("admin");
+                admin.setPassword("admin123"); // Простой пароль
+                admin.setRole(Role.ADMIN);
+                userRepository.save(admin);
 
-            User user = new User();
-            user.setUsername("user");
-            user.setPassword(passwordEncoder.encode("user123"));
-            user.setRole(Role.USER);
-            userRepository.save(user);
+                User user = new User();
+                user.setUsername("user");
+                user.setPassword("user123"); // Простой пароль
+                user.setRole(Role.USER);
+                userRepository.save(user);
 
-            log.info("Default users initialized successfully");
+                log.info("Default users initialized successfully");
+            }
+        } catch (Exception e) {
+            log.error("Error initializing default users", e);
         }
     }
 }
