@@ -1,13 +1,14 @@
-// DepartmentService.java
 package com.example.employeemanagement.service;
 
-import com.example.employeemanagement.dto.department.DepartmentDto;
-import com.example.employeemanagement.dto.department.DepartmentRequest;
-import com.example.employeemanagement.entity.Department;
+import com.example.employeemanagement.dto.request.DepartmentRequest;
+import com.example.employeemanagement.dto.response.DepartmentResponse;
 
-public interface DepartmentService extends BaseService<Department, DepartmentDto> {
+import java.util.List;
 
-    DepartmentDto create(DepartmentRequest request);
-    DepartmentDto update(Long id, DepartmentRequest request);
-    boolean existsByName(String name);
+public interface DepartmentService {
+    List<DepartmentResponse> findAll();
+    DepartmentResponse findById(Long id);
+    DepartmentResponse create(DepartmentRequest departmentRequest);
+    DepartmentResponse update(Long id, DepartmentRequest departmentRequest);
+    void delete(Long id);
 }

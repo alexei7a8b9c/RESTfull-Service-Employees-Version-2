@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -24,6 +26,9 @@ public class Department {
 
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
+
+    @ManyToMany(mappedBy = "departments")
+    private Set<Employee> employees = new HashSet<>();
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

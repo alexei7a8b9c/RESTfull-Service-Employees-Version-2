@@ -1,0 +1,416 @@
+### Base URL
+@baseUrl = http://localhost:8080
+
+### 1. Аутентификация
+
+### Логин админа
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+> {%
+    client.global.set("admin_token", response.body.data.token);
+    client.log("Admin token: " + client.global.get("admin_token"));
+%}
+
+### Логин пользователя
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "user",
+  "password": "user123"
+}
+
+> {%
+    client.global.set("user_token", response.body.data.token);
+    client.log("User token: " + client.global.get("user_token"));
+%}
+
+### 2. Управление отделами (Departments)
+
+### Получить все отделы
+GET {{baseUrl}}/api/departments
+Authorization: Bearer {{admin_token}}
+
+### Получить отдел по ID
+GET {{baseUrl}}/api/departments/1
+Authorization: Bearer {{admin_token}}
+
+### Создать новый отдел
+POST {{baseUrl}}/api/departments
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Research and Development",
+  "description": "Research and Development Department"
+}
+
+### Обновить отдел
+PUT {{baseUrl}}/api/departments/1
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "name": "IT Department Updated",
+  "description": "Updated IT Department description"
+}
+
+### Удалить отдел
+DELETE {{baseUrl}}/api/departments/6
+Authorization: Bearer {{admin_token}}
+
+### 3. Управление сотрудниками (Employees)
+
+### Получить всех сотрудников
+GET {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+
+### Получить сотрудника по ID
+GET {{baseUrl}}/api/employees/1
+Authorization: Bearer {{admin_token}}
+
+### Поиск сотрудников с фильтрами
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "",
+  "status": "ACTIVE",
+  "managerName": "",
+  "departmentIds": [1, 2],
+  "page": 0,
+  "size": 10,
+  "sortBy": "firstName",
+  "sortDirection": "ASC"
+}
+
+### Поиск сотрудников по статусу
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "ACTIVE",
+  "page": 0,
+  "size": 5
+}
+
+### Поиск сотрудников по отделам
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "departmentIds": [1, 3],
+  "page": 0,
+  "size": 10
+}
+
+### Создать нового сотрудника
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Alex",
+  "lastName": "Petrov",
+  "email": "alex.petrov@company.com",
+  "phone": "+1234567899",
+  "status": "ACTIVE",
+  "photoUrl": "https://example.com/photos/alex.jpg",
+  "hireDate": "2023-01-15",
+  "managerId": 1,
+  "departmentIds": [1, 2]
+}
+
+> {%
+    client.global.set("new_employee_id", response.body.data.id);
+    client.log("New employee ID: " + client.global.get("new_employee_id"));
+%}
+
+### Обновить сотрудника
+PUT {{baseUrl}}/api/employees/{{new_employee_id}}
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Alexander",
+  "lastName": "Petrov",
+  "email": "alexander.petrov@company.com",
+  "phone": "+1234567899",
+  "status": "ACTIVE",
+  "photoUrl": "https://example.com/photos/alexander.jpg",
+  "hireDate": "2023-01-15",
+  "managerId": 1,
+  "departmentIds": [1, 3]
+}
+
+### Обновить фото сотрудника
+PATCH {{baseUrl}}/api/employees/{{new_employee_id}}/photo?photoUrl=https://example.com/photos/new-photo.jpg
+Authorization: Bearer {{admin_token}}
+
+### Удалить сотрудника
+DELETE {{baseUrl}}/api/employees/{{new_employee_id}}
+Authorization: Bearer {{admin_token}}
+
+### 4. Тесты валидации
+
+### Создать сотрудника с невалидными данными (отсутствует firstName)
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "lastName": "Test",
+  "email": "invalid-email",
+  "status": "INVALID_STATUS"
+}
+
+### Создать отдел с невалидными данными (отсутствует name)
+POST {{baseUrl}}/api/departments
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "description": "Department without name"
+}
+
+### 5. Тесты безопасности и прав доступа
+
+### Попытка создать сотрудника без авторизации
+POST {{baseUrl}}/api/employees
+Content-Type: application/json
+
+{
+  "firstName": "Unauthorized",
+  "lastName": "User",
+  "status": "ACTIVE"
+}
+
+### Попытка создать отдел с ролью USER
+POST {{baseUrl}}/api/departments
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "name": "User Department",
+  "description": "Department created by user"
+}
+
+### Попытка удалить сотрудника с ролью USER
+DELETE {{baseUrl}}/api/employees/1
+Authorization: Bearer {{user_token}}
+
+### 6. Тесты для несуществующих ресурсов
+
+### Получить несуществующего сотрудника
+GET {{baseUrl}}/api/employees/9999
+Authorization: Bearer {{admin_token}}
+
+### Получить несуществующий отдел
+GET {{baseUrl}}/api/departments/9999
+Authorization: Bearer {{admin_token}}
+
+### Обновить несуществующего сотрудника
+PUT {{baseUrl}}/api/employees/9999
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Non",
+  "lastName": "Existent",
+  "status": "ACTIVE"
+}
+
+### 7. Тесты пагинации и сортировки
+
+### Пагинация сотрудников - страница 1
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "page": 0,
+  "size": 2,
+  "sortBy": "lastName",
+  "sortDirection": "ASC"
+}
+
+### Пагинация сотрудников - страница 2
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "page": 1,
+  "size": 2,
+  "sortBy": "firstName",
+  "sortDirection": "DESC"
+}
+
+### 8. Тесты для Swagger документации
+
+### Получить Swagger UI (должен быть доступен без авторизации)
+GET {{baseUrl}}/swagger-ui.html
+
+### Получить OpenAPI спецификацию (должен быть доступен без авторизации)
+GET {{baseUrl}}/api-docs
+
+### 9. Тесты здоровья приложения
+
+### Health check (если включен Spring Actuator)
+GET {{baseUrl}}/actuator/health
+
+### 10. Комплексные тесты
+
+### Создать отдел и сотрудника в этом отделе
+### Шаг 1: Создать отдел
+POST {{baseUrl}}/api/departments
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "name": "Quality Assurance",
+  "description": "Quality Assurance Department"
+}
+
+> {%
+    client.global.set("new_department_id", response.body.data.id);
+    client.log("New department ID: " + client.global.get("new_department_id"));
+%}
+
+### Шаг 2: Создать сотрудника в новом отделе
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "QA",
+  "lastName": "Engineer",
+  "email": "qa.engineer@company.com",
+  "phone": "+1234567800",
+  "status": "ACTIVE",
+  "managerId": 1,
+  "departmentIds": [{{new_department_id}}]
+}
+
+> {%
+    client.global.set("qa_employee_id", response.body.data.id);
+    client.log("QA Employee ID: " + client.global.get("qa_employee_id"));
+%}
+
+### Шаг 3: Проверить, что сотрудник создан с правильным отделом
+GET {{baseUrl}}/api/employees/{{qa_employee_id}}
+Authorization: Bearer {{admin_token}}
+
+### Шаг 4: Поиск сотрудников в новом отделе
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "departmentIds": [{{new_department_id}}]
+}
+
+### 11. Тесты soft delete
+
+### Создать сотрудника для теста удаления
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "ToDelete",
+  "lastName": "Employee",
+  "email": "delete.me@company.com",
+  "status": "ACTIVE"
+}
+
+> {%
+    client.global.set("employee_to_delete_id", response.body.data.id);
+    client.log("Employee to delete ID: " + client.global.get("employee_to_delete_id"));
+%}
+
+### Удалить сотрудника (soft delete)
+DELETE {{baseUrl}}/api/employees/{{employee_to_delete_id}}
+Authorization: Bearer {{admin_token}}
+
+### Попытка получить удаленного сотрудника (должен вернуть 404)
+GET {{baseUrl}}/api/employees/{{employee_to_delete_id}}
+Authorization: Bearer {{admin_token}}
+
+### Проверить, что удаленный сотрудник не появляется в списке
+GET {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+
+### 12. Тесты для разных статусов сотрудников
+
+### Создать сотрудника со статусом ON_LEAVE
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "OnLeave",
+  "lastName": "Employee",
+  "email": "on.leave@company.com",
+  "status": "ON_LEAVE"
+}
+
+### Поиск сотрудников со статусом ON_LEAVE
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "ON_LEAVE"
+}
+
+### 13. Тесты для менеджеров
+
+### Создать менеджера
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Senior",
+  "lastName": "Manager",
+  "email": "senior.manager@company.com",
+  "status": "ACTIVE"
+}
+
+> {%
+    client.global.set("new_manager_id", response.body.data.id);
+    client.log("New manager ID: " + client.global.get("new_manager_id"));
+%}
+
+### Создать подчиненного для менеджера
+POST {{baseUrl}}/api/employees
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "firstName": "Junior",
+  "lastName": "Employee",
+  "email": "junior.employee@company.com",
+  "status": "ACTIVE",
+  "managerId": {{new_manager_id}}
+}
+
+### Поиск сотрудников по имени менеджера
+POST {{baseUrl}}/api/employees/search
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "managerName": "Senior"
+}
