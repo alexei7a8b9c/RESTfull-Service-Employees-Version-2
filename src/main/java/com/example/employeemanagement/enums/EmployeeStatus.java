@@ -1,4 +1,8 @@
 package com.example.employeemanagement.enums;
 
-public class EmployeeStatus {
+public enum EmployeeStatus {
+    ACTIVE,
+    INACTIVE,
+    ON_LEAVE,
+    TERMINATED
 }
